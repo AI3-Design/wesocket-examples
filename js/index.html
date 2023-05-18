@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 示例</title>
+    <style>
+        #messages {
+            border: 1px solid black;
+            padding: 10px;
+            width: 100%;
+            height: 100vh;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #messages p {
+            margin: 0
+        }
+    </style>
+</head>
+
+<body>
+    <h1>WebSocket 示例</h1>
+
+
+    <input type="text" id="akInput" placeholder="请输入accessKey">
+    <input type="text" id="skInput" placeholder="请输入secretKey">
+    <button id="connectButton">连接</button>
+    
+    <div>
+        <button id="imagineButton">画图</button>
+        <button id="describeButton">图生文</button>
+        <button id="varyButton">vary</button>
+    </div>
+
+    <div id="messages"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+
+        // 导入所需的库
+        const crypto = window.crypto.subtle;
+        // 更改为您的WebSocket服务器地址
+        const websocketBaseUrl = 'wss://midjourney-api.ai3.design/ws?mode=dev';
+        // const websocketBaseUrl = 'ws://localhost:8087/ws?mode=dev';
+
+
+        const messagesContainer = document.getElementById('messages');
+        const imagineButton = document.getElementById('imagineButton');
+        const describeButtion = document.getElementById('describeButton');
+        const connectButtion = document.getElementById('connectButton');
+        const varyButton = document.getElementById('varyButton');
+
+
+
+
+        // 使用SHA-256对字符串进行签名
+        async function signString(stringToSign, secretKey) {
+            const encoder = new TextEncoder();
+            const keyData = encoder.encode(secretKey);
+            const stringToSignData = encoder.encode(stringToSign);
+
+            const key = await crypto.importKey(
+                'raw',
+                keyData,
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+
+
+            const signatureArrayBuffer = await crypto.sign('HMAC', key, stringToSignData);
+            const signatureBytes = new Uint8Array(signatureArrayBuffer);
+            const signatureBase64 = btoa(String.fromCharCode(...signatureBytes));
+
+            // 转换为URL安全的Base64编码
+            const urlSafeBase64 = signatureBase64
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+
+            return urlSafeBase64;
+        }
+
+        let websocket;
+
+        // 生成带签名的WebSocket URL并建立连接
+        connectButtion.addEventListener('click',async function connectWebSocket() {
+            const akInput = document.getElementById('akInput');
+            const skInput = document.getElementById('skInput');
+            const websocketUrl = websocketBaseUrl;
+            const accessKey = akInput.value;
+            const secretKey = skInput.value;
+
+            console.log(accessKey, secretKey)
+
+            let heartbeatInterval;
+
+            // 创建WebSocket连接
+            websocket = new WebSocket(websocketUrl);
+
+            const sendHeartbeat = () => {
+                const heartbeatMessage = {
+                    "type": 1,
+                    "data": {
+                        "access_key": accessKey
+                    }
+                };
+                websocket.send(JSON.stringify(heartbeatMessage));
+            }
+
+            const sendAuth = async () => {
+                // 生成随机的nonce
+                const nonce = Math.floor(Math.random() * 1e16);
+                // 生成当前的Unix时间戳
+                const timestamp = Math.floor(Date.now() / 1000);
+                // 准备用于签名的字符串
+                const stringToSign = `access_key=${accessKey}&nonce=${nonce}&timestamp=${timestamp}`;
+                const signature = await signString(stringToSign, secretKey);
+                const authMessage = {
+                    "type": 7,
+                    "data": {
+                        "access_key": accessKey,
+                        "timestamp": timestamp,
+                        "nonce": nonce,
+                        "signature": signature,
+                    }
+                }
+                websocket.send(JSON.stringify(authMessage));
+            }
+
+            // 连接成功后触发
+            websocket.onopen = async (event) => {
+                console.log('WebSocket 已连接:', event);
+                await sendAuth()
+                // 每隔5秒发送心跳消息
+                heartbeatInterval = setInterval(sendHeartbeat, 5000);
+            };
+            // 收到消息时触发
+            websocket.onmessage = (event) => {
+                const message = document.createElement('p');
+                message.textContent = event.data;
+                messagesContainer.appendChild(message);
+            };
+
+            // 连接关闭时触发
+            websocket.onclose = (event) => {
+                console.log('WebSocket 已关闭:', event);
+                // 清除心跳消息定时器
+                clearInterval(heartbeatInterval);
+            };
+
+            // 出现错误时触发
+            websocket.onerror = (error) => {
+                console.log('WebSocket 出现错误:', error);
+            };
+
+
+        });
+
+        imagineButton.addEventListener('click', () => {
+            const imagineTask = {
+                "type": 4,
+                "data": {
+                    "mode": "Fast",
+                    "type": 1,
+                    "imagine": {
+                        "prompt": "cat"
+                    }
+                }
+            };
+            websocket.send(JSON.stringify(imagineTask));
+        })
+
+        describeButton.addEventListener('click', () => {
+            const desTask = {
+                "type": 4,
+                "data": {
+                    "mode": "Fast",
+                    "type": 7,
+                    "describe": {
+                        "file_url": "https://pub-cc4c1f10781c4f63a50a0037a2aaf667.r2.dev/af0059c7713b2486a038c0fcceb397d3.jpg"
+                    }
+                }
+            };
+            websocket.send(JSON.stringify(desTask));
+        })
+        
+        varyButton.addEventListener('click', () => {
+            const varyTask = {
+                "type": 4,
+                "data": {
+                    "mode": "Fast",
+                    "type": 3,
+                    "vary":{
+                        "prompt":"cat --seed 3845599671",
+                        "guild_id": "1099323539225591840",
+                        "channel_id": "1099948528924626946",
+                        "message_id":"1106507093650968627",
+                        "uuid":"2b2e3daf-dd6c-491f-9bc4-370ae46ad35a",
+                        "index":2
+                    }
+                }
+            };
+       
+            websocket.send(JSON.stringify(varyTask));
+        })
+        
+
+    </script>
+</body>
+
+</html>

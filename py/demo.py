@@ -5,12 +5,16 @@ import json
 import random
 import threading
 import time
+import logging
 from websocket import create_connection, WebSocketConnectionClosedException
 
+logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
+
+
 # 更改为您的WebSocket服务器地址
-websocketBaseUrl = 'wss://midjourney-api.ai3.design/ws?mode=dev'
-accessKey = 'your_access_key'
-secretKey = 'your_secret_key'
+websocketBaseUrl = 'wss://midjourney-api.ai3.design/ws'
+accessKey = 'G63oFg4M4cypUARRAHl3JSKdw3mPC_0pDXdJWGEBP0LH5AXG9SmEAw'
+secretKey = 'akYz-FOafdoHYd2feMYe6j1cIPb-Y0ysru3HUYKGqBgLhGAYA3gyNQ'
 
 # 使用SHA-256对字符串进行签名
 def sign_string(stringToSign, secretKey):
@@ -56,9 +60,11 @@ def send_heartbeat(ws):
 def send_imagine_task(ws, prompt):
     imagine_task = {
         "type": 4,
+        "state": "用户id之类的",
         "data": {
             "mode": "Fast",
             "type": 1,
+            "image_proxy": True,
             "imagine": {
                 "prompt": prompt
             }
@@ -69,9 +75,11 @@ def send_imagine_task(ws, prompt):
 def send_describe_task(ws):
     task = {
         "type": 4,
+        "state": "用户id之类的",
         "data": {
             "mode": "Fast",
             "type": 7,
+            "image_proxy": True,
             "describe": {
                 "file_url": "https://pub-cc4c1f10781c4f63a50a0037a2aaf667.r2.dev/af0059c7713b2486a038c0fcceb397d3.jpg"
             }
@@ -84,12 +92,12 @@ def handle_connection():
     send_auth(ws)
     threading.Thread(target=send_heartbeat, args=(ws,)).start()  # Launch heartbeat in the background
     # send_imagine_task(ws, "cat") # Launch imagine task
-    send_describe_task(ws)
+    # send_describe_task(ws)
     try:
         while True:
             message = ws.recv()
-            print(f"Received message: {message}")
+            logging.info(f"Received message: {message}")
     except WebSocketConnectionClosedException:
-        print("Connection with server closed")
+        logging.info("Connection with server closed")
 
 handle_connection()

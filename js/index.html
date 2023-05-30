@@ -29,11 +29,12 @@
     <input type="text" id="akInput" placeholder="请输入accessKey">
     <input type="text" id="skInput" placeholder="请输入secretKey">
     <button id="connectButton">连接</button>
-    
+
     <div>
         <button id="imagineButton">画图</button>
         <button id="describeButton">图生文</button>
         <button id="varyButton">vary</button>
+        <button id="upscaleButton">放大图片</button>
     </div>
 
     <div id="messages"></div>
@@ -43,8 +44,8 @@
         // 导入所需的库
         const crypto = window.crypto.subtle;
         // 更改为您的WebSocket服务器地址
-        const websocketBaseUrl = 'wss://midjourney-api.ai3.design/ws?mode=dev';
-        // const websocketBaseUrl = 'ws://localhost:8087/ws?mode=dev';
+        const websocketBaseUrl = 'wss://midjourney-api.ai3.design/ws';
+        // const websocketBaseUrl = 'ws://localhost:8087/ws';
 
 
         const messagesContainer = document.getElementById('messages');
@@ -52,7 +53,7 @@
         const describeButtion = document.getElementById('describeButton');
         const connectButtion = document.getElementById('connectButton');
         const varyButton = document.getElementById('varyButton');
-
+        const upscaleButton = document.getElementById('upscaleButton');
 
 
 
@@ -87,7 +88,7 @@
         let websocket;
 
         // 生成带签名的WebSocket URL并建立连接
-        connectButtion.addEventListener('click',async function connectWebSocket() {
+        connectButtion.addEventListener('click', async function connectWebSocket() {
             const akInput = document.getElementById('akInput');
             const skInput = document.getElementById('skInput');
             const websocketUrl = websocketBaseUrl;
@@ -102,8 +103,10 @@
             websocket = new WebSocket(websocketUrl);
 
             const sendHeartbeat = () => {
+                const nonce = Math.floor(Math.random() * 1e16);
                 const heartbeatMessage = {
                     "type": 1,
+                    "state": nonce + "",
                     "data": {
                         "access_key": accessKey
                     }
@@ -121,6 +124,7 @@
                 const signature = await signString(stringToSign, secretKey);
                 const authMessage = {
                     "type": 7,
+                    "state": nonce + "",
                     "data": {
                         "access_key": accessKey,
                         "timestamp": timestamp,
@@ -163,11 +167,13 @@
         imagineButton.addEventListener('click', () => {
             const imagineTask = {
                 "type": 4,
+                "state": "111",
                 "data": {
                     "mode": "Fast",
                     "type": 1,
+                    "image_proxy": true,
                     "imagine": {
-                        "prompt": "cat"
+                        "prompt": "A beautiful girl, Pixar style --ar 1:1 --q 1 --s 100 --seed 2109691172 --v 5.1"
                     }
                 }
             };
@@ -177,6 +183,7 @@
         describeButton.addEventListener('click', () => {
             const desTask = {
                 "type": 4,
+                "state": "222",
                 "data": {
                     "mode": "Fast",
                     "type": 7,
@@ -187,27 +194,49 @@
             };
             websocket.send(JSON.stringify(desTask));
         })
-        
+
         varyButton.addEventListener('click', () => {
             const varyTask = {
                 "type": 4,
+                "state": "333",
                 "data": {
                     "mode": "Fast",
                     "type": 3,
-                    "vary":{
-                        "prompt":"cat --seed 3845599671",
+                    "vary": {
+                        "prompt": "cat --seed 3845599671",
                         "guild_id": "1099323539225591840",
                         "channel_id": "1099948528924626946",
-                        "message_id":"1106507093650968627",
-                        "uuid":"2b2e3daf-dd6c-491f-9bc4-370ae46ad35a",
-                        "index":2
+                        "message_id": "1106507093650968627",
+                        "uuid": "2b2e3daf-dd6c-491f-9bc4-370ae46ad35a",
+                        "index": 2
                     }
                 }
             };
-       
+
             websocket.send(JSON.stringify(varyTask));
         })
-        
+
+        upscaleButton.addEventListener('click', () => {
+            const task = {
+                "type": 4,
+                "state": "4444",
+                "data" :{ 
+                    "type": 2, 
+                    "image_proxy": true,
+                    "upscale": { 
+                        "prompt": "girl --seed 1048383157", 
+                        "guild_id": "1087954943656333354", 
+                        "channel_id": "1087954944591667212", 
+                        "message_id": "1112550620629585940", 
+                        "uuid": "1da38e93-051e-4657-8e34-db5886860043", 
+                        "index": 4
+                    } 
+                },
+            }
+
+            websocket.send(JSON.stringify(task));
+        })
+
 
     </script>
 </body>
